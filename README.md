@@ -22,6 +22,9 @@
   <a href="https://www.ycombinator.com/companies/graphify"><img src="https://img.shields.io/badge/Y%20Combinator-S26-F0652F?style=flat&logo=ycombinator&logoColor=white" alt="YC S26"/></a>
 </p>
 
+> **⚠️ Unofficial Fork — Haxe Support**
+> This repository is a fork of [Graphify Labs / graphify](https://github.com/Graphify-Labs/graphify) specifically extended with **first-class Haxe (`.hx`) and HXML (`.hxml`) AST extraction**. See [Haxe features](#haxe) below for details.
+
 Type `/graphify` in your AI coding assistant and it maps your entire project (code, docs, PDFs, images, videos) into a **knowledge graph** you can **query instead of grepping** through files.
 
 - **Code maps for free, fully local.** Code is parsed with tree-sitter AST: deterministic, no LLM, nothing leaves your machine. (Docs, PDFs, images and video use your assistant's model, or a configured API key, for a semantic pass.)
