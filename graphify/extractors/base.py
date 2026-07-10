@@ -29,6 +29,9 @@ _LANGUAGE_BUILTIN_GLOBALS: frozenset[str] = frozenset({
     "print", "open", "isinstance", "type", "super", "sorted", "reversed",
     "any", "all", "abs", "round", "next", "iter", "hash", "id", "repr",
     "callable", "getattr", "setattr", "hasattr", "delattr", "vars", "dir",
+    # Haxe built-in callables
+    "trace", "Type", "Reflect", "Std", "Math", "StringTools", "Lambda",
+    "EReg", "Xml", "Json", "Http",
 })
 
 

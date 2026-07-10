@@ -52,6 +52,8 @@ from graphify.extractors.sql import extract_sql  # noqa: F401
 from graphify.extractors.terraform import extract_terraform  # noqa: F401
 from graphify.extractors.verilog import extract_verilog  # noqa: F401
 from graphify.extractors.zig import extract_zig  # noqa: F401
+from graphify.extractors.haxe import extract_haxe, _resolve_cross_file_haxe_imports  # noqa: F401
+from graphify.extractors.hxml import extract_hxml  # noqa: F401
 from graphify.security import sanitize_metadata
 from graphify.paths import disambiguate_ambiguous_candidates
 
@@ -1787,6 +1789,7 @@ _LANG_FAMILY_BY_EXT: dict[str, str] = {
     ".ex": "elixir", ".exs": "elixir",
     ".jl": "julia",
     ".dart": "dart",
+    ".hx": "haxe", ".hxml": "haxe",
     ".sh": "shell", ".bash": "shell",
     ".ps1": "powershell", ".psm1": "powershell", ".psd1": "powershell",
 }
@@ -3772,6 +3775,8 @@ _DISPATCH: dict[str, Any] = {
     ".luau": extract_lua,
     ".toc": extract_lua,
     ".zig": extract_zig,
+    ".hx": extract_haxe,
+    ".hxml": extract_hxml,
     ".ps1": extract_powershell,
     ".psm1": extract_powershell,
     ".psd1": extract_powershell_manifest,
@@ -3845,6 +3850,8 @@ _EXTRA_FOR_EXTENSION = {
     ".hcl": "terraform",
     ".dm": "dm",
     ".dme": "dm",
+    ".hx": "haxe",
+    ".hxml": "haxe",
 }
 
 
@@ -4510,6 +4517,16 @@ def extract(
         except Exception as exc:
             import logging
             logging.getLogger(__name__).warning("C# cross-file import resolution failed, skipping: %s", exc)
+
+    # Cross-file Haxe import resolution
+    hx_paths = [p for p in paths if p.suffix == ".hx"]
+    if hx_paths:
+        hx_results = [r for r, p in zip(per_file, paths) if p.suffix == ".hx"]
+        try:
+            all_edges.extend(_resolve_cross_file_haxe_imports(hx_results, hx_paths))
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning("Haxe cross-file import resolution failed, skipping: %s", exc)
 
     # Cross-file call resolution for all languages
     # Each extractor saved unresolved calls in raw_calls. Now that we have all

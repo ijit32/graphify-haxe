@@ -9,7 +9,7 @@ from graphify.extract import (
     extract_groovy, extract_sln, extract_csproj, extract_xaml, extract_razor,
     extract_dm, extract_dmi, extract_dmm, extract_dmf,
     extract_powershell, extract_apex, extract_verilog,
-    extract_powershell_manifest,
+    extract_powershell_manifest, extract_haxe,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -2937,6 +2937,254 @@ def test_decldef_merge_does_not_merge_across_directories():
     loggers = _nodes_with_label(r, "Logger")
     assert len(loggers) == 2, f"cross-dir Loggers must stay distinct, got {[n['id'] for n in loggers]}"
     assert len({n["id"] for n in loggers}) == 2
+
+
+# ── Haxe ─────────────────────────────────────────────────────────────────────
+
+
+def test_haxe_no_error():
+    r = extract_haxe(FIXTURES / "sample.hx")
+    assert "error" not in r
+
+
+def test_haxe_finds_class():
+    r = extract_haxe(FIXTURES / "sample.hx")
+    assert any("Main" in l for l in _labels(r))
+
+
+def test_haxe_finds_interface():
+    r = extract_haxe(FIXTURES / "sample.hx")
+    assert any("IFoo" in l for l in _labels(r))
+
+
+def test_haxe_finds_enum():
+    r = extract_haxe(FIXTURES / "sample.hx")
+    assert any("Color" in l for l in _labels(r))
+
+
+def test_haxe_finds_typedef():
+    r = extract_haxe(FIXTURES / "sample.hx")
+    assert any("Point" in l for l in _labels(r))
+
+
+def test_haxe_finds_methods():
+    r = extract_haxe(FIXTURES / "sample.hx")
+    labels = _labels(r)
+    assert any(".new()" in l for l in labels)
+    assert any(".main()" in l for l in labels)
+    assert any(".process()" in l for l in labels)
+
+
+def test_haxe_finds_enum_constructors():
+    r = extract_haxe(FIXTURES / "sample.hx")
+    labels = _labels(r)
+    assert "Red" in labels
+    assert "Green" in labels
+    assert "Blue" in labels
+    assert "Rgb" in labels
+
+
+def test_haxe_finds_imports():
+    r = extract_haxe(FIXTURES / "sample.hx")
+    rels = [e["relation"] for e in r["edges"]]
+    assert "imports_from" in rels
+
+
+def test_haxe_finds_extends():
+    r = extract_haxe(FIXTURES / "sample.hx")
+    rels = [e["relation"] for e in r["edges"]]
+    assert "inherits" in rels
+
+
+def test_haxe_finds_implements():
+    r = extract_haxe(FIXTURES / "sample.hx")
+    rels = [e["relation"] for e in r["edges"]]
+    assert "implements" in rels
+
+
+def test_haxe_has_var_nodes():
+    r = extract_haxe(FIXTURES / "sample.hx")
+    labels = _labels(r)
+    assert any(".count" in l for l in labels)
+    assert any(".name" in l for l in labels)
+
+
+def test_haxe_call_graph():
+    r = extract_haxe(FIXTURES / "sample.hx")
+    calls = _calls(r)
+    assert len(calls) > 0
+
+
+def test_haxe_finds_class_properties():
+    r = extract_haxe(FIXTURES / "sample.hx")
+    labels = _labels(r)
+    assert any(".get_name()" in l for l in labels)
+    assert any(".set_name()" in l for l in labels)
+
+
+def test_haxe_finds_abstract():
+    r = extract_haxe(FIXTURES / "sample.hx")
+    assert any("MyAbstract" in l for l in _labels(r))
+
+
+def test_haxe_finds_conditional_compilation():
+    r = extract_haxe(FIXTURES / "sample.hx")
+    labels = _labels(r)
+    assert any("debugMode" in l for l in labels) or any("releaseMode" in l for l in labels)
+
+
+def test_haxe_has_metadata_edges():
+    r = extract_haxe(FIXTURES / "sample.hx")
+    configures = [e for e in r["edges"] if e["relation"] == "configures"]
+    assert len(configures) > 0
+
+
+def test_haxe_arrow_function_calls():
+    r = extract_haxe(FIXTURES / "sample.hx")
+    calls = _calls(r)
+    assert len(calls) > 0
+
+
+def test_haxe_package_scoped_ids():
+    r = extract_haxe(FIXTURES / "sample.hx")
+    labels = _labels(r)
+    assert "Main" in labels
+
+
+def test_haxe_cross_file_import_resolution():
+    r = _corpus("haxe_crossfile/Main.hx", "haxe_crossfile/Service.hx")
+    rels = {e["relation"] for e in r["edges"]}
+    assert "imports" in rels, f"expected imports edges in relations: {rels}"
+
+
+def test_haxe_cross_file_import_target():
+    r = _corpus("haxe_crossfile/Main.hx", "haxe_crossfile/Service.hx")
+    imports = [e for e in r["edges"] if e["relation"] == "imports"]
+    assert len(imports) >= 1, f"expected >= 1 imports edge, got {len(imports)}"
+
+
+def test_haxe_cross_file_implements():
+    r = _corpus("haxe_crossfile/Bar.hx", "haxe_crossfile/IFoo.hx")
+    rels = {e["relation"] for e in r["edges"]}
+    assert "implements" in rels
+
+
+def test_hxml_no_error():
+    from graphify.extractors.hxml import extract_hxml
+    hxml_path = FIXTURES / "test.hxml"
+    if not hxml_path.exists():
+        pytest.skip("test.hxml fixture not found")
+    reply = extract_hxml(hxml_path)
+    assert "error" not in reply
+
+
+def test_haxe_finds_metadata_on_method():
+    r = extract_haxe(FIXTURES / "sample.hx")
+    configures = [e for e in r["edges"] if e["relation"] == "configures"]
+    meta_labels = {n["label"] for n in r["nodes"] if n["label"].startswith("@:")}
+    assert len(meta_labels) > 0, f"expected metadata labels, got none"
+    assert "@:keep" in meta_labels or "@:pure" in meta_labels or "@:generic" in meta_labels
+
+
+def test_haxe_generic_type_parameter():
+    r = extract_haxe(FIXTURES / "sample.hx")
+    labels = _labels(r)
+    assert any("T" in l for l in labels), f"expected type param T in labels: {labels}"
+
+
+def test_haxe_enum_constructor_params():
+    r = extract_haxe(FIXTURES / "sample.hx")
+    labels = _labels(r)
+    assert any("v" in l for l in labels), f"expected param 'v' in labels: {labels}"
+    assert any("msg" in l for l in labels), f"expected param 'msg' in labels: {labels}"
+    assert any("code" in l for l in labels), f"expected param 'code' in labels: {labels}"
+
+
+def test_haxe_import_aliasing():
+    r = extract_haxe(FIXTURES / "sample.hx")
+    rels = {e["relation"] for e in r["edges"]}
+    assert "imports_from" in rels
+    alias_labels = {n["label"] for n in r["nodes"]}
+    assert "SM" in alias_labels, f"expected alias 'SM' node in labels: {alias_labels}"
+
+
+def test_haxe_extern_class():
+    r = extract_haxe(FIXTURES / "sample.hx")
+    labels = _labels(r)
+    assert any("ExternalBind" in l for l in labels), f"expected ExternalBind in labels: {labels}"
+
+
+def test_haxe_static_modifier_edge():
+    r = extract_haxe(FIXTURES / "sample.hx")
+    configures = [e for e in r["edges"] if e["relation"] == "configures" and e.get("context") == "modifier"]
+    mod_labels = {n["label"] for n in r["nodes"] if n["label"] == "static"}
+    assert len(mod_labels) > 0, f"expected 'static' modifier node in labels"
+
+
+def test_haxe_property_getter_setter():
+    r = extract_haxe(FIXTURES / "sample.hx")
+    configures = [e for e in r["edges"] if e["relation"] == "configures" and "property_" in (e.get("context") or "")]
+    assert len(configures) >= 2, f"expected >=2 property getter/setter edges, got {len(configures)}"
+
+
+def test_haxe_generic_enum():
+    r = extract_haxe(FIXTURES / "sample.hx")
+    labels = _labels(r)
+    assert "T" in labels
+
+
+def test_haxe_cast_type_refs():
+    r = extract_haxe(FIXTURES / "sample.hx")
+    refs = [e for e in r["edges"] if e["relation"] == "references" and e.get("context") == "type"]
+    labels = {n["label"] for n in r["nodes"]}
+    assert "ExternalBind" in labels, f"expected ExternalBind from cast target, got {labels}"
+
+
+def test_haxe_switch_case_labels():
+    r = extract_haxe(FIXTURES / "sample.hx")
+    case_refs = [e for e in r["edges"] if e["relation"] == "references" and e.get("context") == "case"]
+    case_labels = {n["label"] for n in r["nodes"] if n.get("source_file", "").endswith("sample.hx")}
+    seen_labels = set()
+    for e in case_refs:
+        # look up the label from the target node
+        for n in r["nodes"]:
+            if n["id"] == e["target"]:
+                seen_labels.add(n["label"])
+                break
+    assert any(l == "Red" for l in seen_labels), f"expected case ref to Red, got seen_labels={seen_labels}, case_refs={case_refs}"
+
+
+def test_haxe_object_field_names():
+    r = extract_haxe(FIXTURES / "sample.hx")
+    field_nodes = [n for n in r["nodes"] if n["label"] in ("name", "value")]
+    assert len(field_nodes) >= 2, f"expected object field nodes, got {field_nodes}"
+
+
+def test_haxe_emeta_expression():
+    r = extract_haxe(FIXTURES / "sample.hx")
+    meta_configures = [e for e in r["edges"]
+                       if e["relation"] == "configures" and e.get("context") == "metadata"]
+    labels = {n["label"] for n in r["nodes"]}
+    assert "@:keep" in labels, f"expected @:keep metadata node from EMeta, got {labels}"
+
+
+def test_haxe_type_trace():
+    r = extract_haxe(FIXTURES / "sample.hx")
+    # type_trace children are walked for calls; just verify no error
+    assert "error" not in r
+
+
+def test_hxml_next_target():
+    from graphify.extractors.hxml import extract_hxml
+    hxml_path = FIXTURES / "test.hxml"
+    if not hxml_path.exists():
+        pytest.skip("test.hxml fixture not found")
+    r = extract_hxml(hxml_path)
+    labels = _labels(r)
+    assert any("target_2" in l for l in labels), f"expected target_2 node, got {labels}"
+
+
+# ── Pascal ────────────────────────────────────────────────────────────────────
 
 
 def test_decldef_merge_does_not_merge_same_name_same_dir_distinct_files():

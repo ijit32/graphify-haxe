@@ -1,0 +1,12 @@
+# Haxe build config
+-cp src
+-main com.graphify.app.Main
+-lib hx3compat
+-D debug
+--interp
+--next
+# Test target
+-cp test
+-main com.graphify.app.TestMain
+-lib hx3compat
+-D test
